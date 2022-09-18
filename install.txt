@@ -1,0 +1,8 @@
+Para descargar las dependencias del proyecto android ejecutamos lo siguiente:
+
+flutter create --platforms android .
+
+Para correr la aplicación necesitaremos conectar el teléfono en modo depuración al ordenador
+y ejecutamos lo siguiente:
+
+flutter run
