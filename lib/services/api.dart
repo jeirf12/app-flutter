@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:example_flutter/environment/environment.dart';
 
 class ApiService {
-  // final String baseurl = "www.googleapis.com";
-  // final String apikey = "AIzaSyDIaZoTbc5NNZ6Hsw2gImr4buDdJd7hVTE";
   final Map<String, String> headers = {
     HttpHeaders.contentTypeHeader: 'application/json',
   };
