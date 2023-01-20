@@ -3,6 +3,7 @@ import 'package:example_flutter/models/options.dart';
 import 'package:example_flutter/services/api.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io';
 
 ApiService apiService = ApiService();
 
@@ -22,13 +23,20 @@ class Home extends StatelessWidget {
         builder: (context) {
           final _optionsWidget = _options.map(
             (element) {
-              return ListTile(
-                title: Text(
-                  element.name,
-                  style: Theme.of(context).textTheme.headline3,
-                ),
-                leading: Icon(element.icon),
-              );
+              return InkWell(
+                  onTap: () {
+                    return;
+                  },
+                  child: ListTile(
+                    title: Text(
+                      element.name,
+                      style: Theme.of(context).textTheme.headline3,
+                    ),
+                    leading: Icon(
+                      element.icon,
+                      color: Colors.blue[300],
+                    ),
+                  ));
             },
           );
           return Scaffold(
