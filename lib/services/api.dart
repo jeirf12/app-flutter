@@ -1,10 +1,11 @@
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:example_flutter/environment/environment.dart';
 
 class ApiService {
-  final String baseurl = "www.googleapis.com";
-  final String apikey = "AIzaSyDIaZoTbc5NNZ6Hsw2gImr4buDdJd7hVTE";
+  // final String baseurl = "www.googleapis.com";
+  // final String apikey = "AIzaSyDIaZoTbc5NNZ6Hsw2gImr4buDdJd7hVTE";
   final Map<String, String> headers = {
     HttpHeaders.contentTypeHeader: 'application/json',
   };
@@ -15,10 +16,10 @@ class ApiService {
       'relatedToVideoId': 'lwelJyNBD3w',
       'type': 'video',
       'maxResults': '10',
-      'key': apikey,
+      'key': environment["apikey"].toString(),
     };
     String api = "youtube/v3/search";
-    Uri uri = Uri.https(baseurl, api, parameters);
+    Uri uri = Uri.https(environment["baseUrl"].toString(), api, parameters);
     var response = await http.get(uri, headers: headers);
     return response;
   }
@@ -27,11 +28,11 @@ class ApiService {
     Map<String, String> parameters = {
       'part': 'snippet%2CcontentDetails%2Cstatistics',
       'maxResults': '10',
-      'key': apikey,
+      'key': environment["apikey"].toString(),
       'id': id,
     };
     String api = "youtube/v3/channels";
-    Uri uri = Uri.https(baseurl, api, parameters);
+    Uri uri = Uri.https(environment["baseUrl"].toString(), api, parameters);
     var response = await http.get(uri, headers: headers);
     return response;
   }
