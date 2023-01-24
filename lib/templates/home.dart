@@ -10,8 +10,36 @@ ApiService apiService = ApiService();
 String title = "Download Videos";
 
 final List<Option> _options = [
-  Option('Downloads', Icons.download),
-  Option('Exit', Icons.exit_to_app),
+  Option('Downloads', Icons.download, (context) => {print("download")}),
+  Option(
+      'Exit',
+      Icons.exit_to_app,
+      (context) => {
+            showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text("Exit App"),
+                    content: Text("¿Desea salir de la aplicación?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          print("Cancel");
+                          Navigator.of(context).pop();
+                        },
+                        child: Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          print("Si");
+                          exit(0);
+                        },
+                        child: Text("Si"),
+                      ),
+                    ],
+                  );
+                })
+          }),
 ];
 
 class Home extends StatelessWidget {
@@ -25,7 +53,7 @@ class Home extends StatelessWidget {
             (element) {
               return InkWell(
                   onTap: () {
-                    return;
+                    element.action(context);
                   },
                   child: ListTile(
                     title: Text(
