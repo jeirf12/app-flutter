@@ -38,9 +38,7 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
 
       final taskId = '${videoId}_${streamInfo.tag}';
       final isAudioOnly = streamInfo is AudioOnlyStreamInfo;
-      final extension = isAudioOnly
-          ? streamInfo.codec.subtype
-          : 'mp4';
+      final extension = isAudioOnly ? streamInfo.codec.subtype : 'mp4';
       final filename = video.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '');
       final totalBytes = streamInfo.size.totalBytes;
 
@@ -57,7 +55,7 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
       task.filePath = outputPath;
       notifyListeners();
 
-      _runSimpleDownload(task, taskId, streamInfo, outputPath);
+      unawaited(_runSimpleDownload(task, taskId, streamInfo, outputPath));
       return true;
     } catch (e) {
       print('Error obteniendo info del video: $e');
@@ -65,7 +63,7 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
     }
   }
 
-  void _runSimpleDownload(DownloadTask task, String taskId,
+  Future<void> _runSimpleDownload(DownloadTask task, String taskId,
       StreamInfo streamInfo, String outputPath) async {
     try {
       final sink = File(outputPath).openWrite();

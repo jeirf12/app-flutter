@@ -22,18 +22,18 @@ Future<void> showDownloadOptions(BuildContext context, String videoId) async {
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.music_note, color: Colors.blue),
-            title: const Text('M4A (Solo audio)'),
-            onTap: () {
+            title: const Text('Mp3 (Solo audio)'),
+            onTap: () async {
               Navigator.pop(sheetContext);
-              _download(context, videoId, isAudio: true);
+              await _download(context, videoId, isAudio: true);
             },
           ),
           ListTile(
             leading: const Icon(Icons.movie, color: Colors.red),
             title: const Text('MP4 (Video)'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(sheetContext);
-              _download(context, videoId, isAudio: false);
+              await _download(context, videoId, isAudio: false);
             },
           ),
         ],
@@ -42,7 +42,7 @@ Future<void> showDownloadOptions(BuildContext context, String videoId) async {
   );
 }
 
-void _download(
+Future<void> _download(
   BuildContext context,
   String videoId, {
   required bool isAudio,
