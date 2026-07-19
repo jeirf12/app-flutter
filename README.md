@@ -141,13 +141,44 @@ Si es la primera vez que se corre el proyecto, se deben generar los archivos nat
 flutter create --platforms android .
 ```
 
+> ⚠️ **Importante:** Al regenerar la carpeta `android/`, el `AndroidManifest.xml` se restablece a los valores por defecto. Debes agregar manualmente los siguientes permisos en `android/app/src/main/AndroidManifest.xml` dentro del tag `<manifest>`:
+>
+> ```xml
+> <!-- Permisos para Android < 13 (SDK < 33) -->
+> <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+>     android:maxSdkVersion="32" />
+> <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+>     android:maxSdkVersion="29" />
+>
+> <!-- Permisos para Android >= 13 (SDK >= 33) -->
+> <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+>     android:minSdkVersion="33" />
+> <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
+>     android:minSdkVersion="33" />
+> <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"
+>     android:minSdkVersion="33" />
+>
+> <!-- Permiso de internet (necesario para descargas) -->
+> <uses-permission android:name="android.permission.INTERNET" />
+> ```
+
 ### 2. Obtener paquetes de Dart/Flutter
 
 ```bash
 flutter pub get
 ```
 
-### 3. Conectar el dispositivo
+### 3. Generar íconos de la app
+
+Después de obtener los paquetes, ejecuta el generador de íconos para crear los archivos en todas las densidades de Android:
+
+```bash
+dart run flutter_launcher_icons
+```
+
+> ⚠️ Este comando debe ejecutarse cada vez que se cambie la imagen en `assets/icon/app_icon.png`.
+
+### 4. Conectar el dispositivo
 
 Conecta tu teléfono Android por USB con **depuración USB** activada y verifica que Flutter lo detecte:
 
@@ -155,7 +186,7 @@ Conecta tu teléfono Android por USB con **depuración USB** activada y verifica
 flutter devices
 ```
 
-### 4. Ejecutar la app
+### 5. Ejecutar la app
 
 ```bash
 flutter run
