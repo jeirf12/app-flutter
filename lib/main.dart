@@ -2,13 +2,34 @@ import 'dart:io';
 import 'package:example_flutter/services/download_manager.dart';
 import 'package:example_flutter/templates/home.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _initForegroundTask();
   await _requestInitialPermissions();
   await downloadManager.loadTasks();
   runApp(const MyApp());
+}
+
+void _initForegroundTask() {
+  FlutterForegroundTask.init(
+    androidNotificationOptions: AndroidNotificationOptions(
+      channelId: 'download_channel',
+      channelName: 'Descargas en progreso',
+      channelDescription: 'Notificación activa mientras se descargan archivos',
+      channelImportance: NotificationChannelImportance.LOW,
+      priority: NotificationPriority.LOW,
+    ),
+    iosNotificationOptions: const IOSNotificationOptions(showNotification: false),
+    foregroundTaskOptions: ForegroundTaskOptions(
+      eventAction: ForegroundTaskEventAction.nothing(),
+      autoRunOnBoot: false,
+      allowWakeLock: true,
+      allowWifiLock: false,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

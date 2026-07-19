@@ -2,10 +2,10 @@ import 'package:example_flutter/models/options.dart';
 import 'package:example_flutter/services/api.dart';
 import 'package:example_flutter/templates/downloads_screen.dart';
 import 'package:example_flutter/templates/select_option_download.dart';
+import 'package:example_flutter/utils/dialogs.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'dart:io';
 
 ApiService apiService = ApiService();
 
@@ -19,25 +19,7 @@ final List<Option> _options = [
   Option(
     'Salir',
     Icons.exit_to_app,
-    (context) => showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Salir de la app"),
-          content: const Text("¿Desea salir de la aplicación?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancelar"),
-            ),
-            TextButton(
-              onPressed: () => exit(0),
-              child: const Text("Sí"),
-            ),
-          ],
-        );
-      },
-    ),
+    (context) => showExitConfirmDialog(context),
   ),
 ];
 
@@ -137,39 +119,47 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            IconButton(
-              onPressed: _menuOptions,
-              icon: const Icon(Icons.menu),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                textAlignVertical: TextAlignVertical.center,
-                onSubmitted: (_) => _search(),
-                decoration: InputDecoration(
-                  hintText: 'Buscar en YouTube...',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  border: InputBorder.none,
-                  isCollapsed: true,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (!context.mounted) return;
+        await showExitConfirmDialog(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          titleSpacing: 0,
+          title: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: _menuOptions,
+                icon: const Icon(Icons.menu),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  textAlignVertical: TextAlignVertical.center,
+                  onSubmitted: (_) => _search(),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en YouTube...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.teal),
-              onPressed: _search,
-            ),
-          ],
+              IconButton(
+                icon: const Icon(Icons.search, color: Colors.teal),
+                onPressed: _search,
+              ),
+            ],
+          ),
         ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -229,8 +219,7 @@ class _HomeState extends State<Home> {
                   builder: (_, snap) {
                     if (snap.hasData && snap.data != null) {
                       return CircleAvatar(
-                        backgroundImage:
-                            CachedNetworkImageProvider(snap.data!),
+                        backgroundImage: CachedNetworkImageProvider(snap.data!),
                       );
                     }
                     return CircleAvatar(child: Text(titleText[0]));

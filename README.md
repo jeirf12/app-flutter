@@ -29,6 +29,8 @@ Aplicación Android desarrollada en Flutter que permite buscar videos de YouTube
 - 📂 Los archivos se guardan en `/storage/emulated/0/Download/`
 - 💾 Las tareas de descarga **persisten** entre sesiones (JSON local)
 - 📱 Íconos adaptativos generados con `flutter_launcher_icons`
+- 🔔 **Servicio en primer plano** con notificación de progreso (la descarga continúa con la app minimizada)
+- ⚠️ **Diálogo de confirmación** al salir si hay descargas activas
 
 ---
 
@@ -43,6 +45,7 @@ Aplicación Android desarrollada en Flutter que permite buscar videos de YouTube
 | `device_info_plus` | Detectar versión de Android para elegir el permiso correcto |
 | `path_provider` | Ruta del directorio de documentos para persistir tareas |
 | `open_file` | Abrir el archivo descargado desde la pantalla de descargas |
+| `flutter_foreground_task` | Servicio en primer plano Android + notificación de progreso en tiempo real |
 
 ---
 
@@ -63,10 +66,17 @@ Usuario
   │               └─▶ [MP4] → youtube_explode_dart → MuxedStream (mejor calidad)
   │                       │
   │                       └─▶ DownloadManager
-  │                               ├─▶ Verifica permisos
+  │                               ├─▶ Verifica permisos (runtime)
   │                               ├─▶ Crea DownloadTask
+  │                               ├─▶ Inicia ForegroundService (notificación persistente)
   │                               ├─▶ Stream de bytes → archivo en /Download/
-  │                               └─▶ Notifica progreso en tiempo real (ValueNotifier)
+  │                               ├─▶ Notifica progreso en tiempo real (ValueNotifier)
+  │                               └─▶ Detiene ForegroundService al terminar todas las tareas
+  │
+  └─▶ Botón atrás / opción Salir
+          └─▶ showExitConfirmDialog
+                  ├─▶ Sin descargas activas → confirmación estándar → exit(0)
+                  └─▶ Con descargas activas → advertencia de cancelación → exit(0)
   │
   └─▶ Pantalla de Descargas
           ├─▶ Progreso en tiempo real
@@ -97,11 +107,13 @@ lib/
 │   └── options.dart                 # Modelo para opciones del menú
 ├── services/
 │   ├── api.dart                     # YouTube Data API v3 (búsqueda y canal)
-│   └── download_manager.dart        # Lógica de descarga, pausa, cancelación y persistencia
-└── templates/
-    ├── home.dart                    # Pantalla principal: búsqueda y lista de resultados
-    ├── select_option_download.dart  # BottomSheet MP3/MP4 + inicio de descarga
-    └── downloads_screen.dart        # Pantalla de descargas activas/completadas
+│   └── download_manager.dart        # Lógica de descarga, servicio en primer plano y persistencia
+├── templates/
+│   ├── home.dart                    # Pantalla principal: búsqueda y lista de resultados
+│   ├── select_option_download.dart  # BottomSheet MP3/MP4 + inicio de descarga
+│   └── downloads_screen.dart        # Pantalla de descargas activas/completadas
+└── utils/
+    └── dialogs.dart                 # Diálogos reutilizables (ej. confirmación de salida)
 ```
 
 ---
@@ -144,13 +156,13 @@ flutter create --platforms android .
 > ⚠️ **Importante:** Al regenerar la carpeta `android/`, el `AndroidManifest.xml` se restablece a los valores por defecto. Debes agregar manualmente los siguientes permisos en `android/app/src/main/AndroidManifest.xml` dentro del tag `<manifest>`:
 >
 > ```xml
-> <!-- Permisos para Android < 13 (SDK < 33) -->
+> <!-- Almacenamiento para Android < 13 (SDK < 33) -->
 > <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
 >     android:maxSdkVersion="32" />
 > <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
 >     android:maxSdkVersion="29" />
 >
-> <!-- Permisos para Android >= 13 (SDK >= 33) -->
+> <!-- Almacenamiento para Android >= 13 (SDK >= 33) -->
 > <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
 >     android:minSdkVersion="33" />
 > <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"
@@ -158,8 +170,22 @@ flutter create --platforms android .
 > <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"
 >     android:minSdkVersion="33" />
 >
-> <!-- Permiso de internet (necesario para descargas) -->
+> <!-- Internet -->
 > <uses-permission android:name="android.permission.INTERNET" />
+>
+> <!-- Servicio en primer plano -->
+> <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+> <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+> <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+> ```
+>
+> También dentro del tag `<application>` declara el servicio de primer plano:
+>
+> ```xml
+> <service
+>     android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+>     android:foregroundServiceType="dataSync"
+>     android:stopWithTask="true" />
 > ```
 
 ### 2. Obtener paquetes de Dart/Flutter
@@ -246,14 +272,17 @@ Salida: `build/app/outputs/bundle/release/app-release.aab`
 
 ## Permisos requeridos
 
-| Permiso | Motivo |
-|---|---|
-| `INTERNET` | Búsqueda y descarga de streams |
-| `READ_EXTERNAL_STORAGE` | Acceso a almacenamiento (Android < 13) |
-| `WRITE_EXTERNAL_STORAGE` | Guardar archivos descargados (Android < 13) |
-| `READ_MEDIA_VIDEO` | Acceso a videos (Android 13+) |
-| `READ_MEDIA_AUDIO` | Acceso a audio (Android 13+) |
-| `MANAGE_EXTERNAL_STORAGE` | Escritura en `/Download/` en versiones recientes |
+| Permiso | SDK | Motivo |
+|---|---|---|
+| `INTERNET` | Todos | Búsqueda y descarga de streams |
+| `READ_EXTERNAL_STORAGE` | < 33 | Acceso a almacenamiento (Android < 13) |
+| `WRITE_EXTERNAL_STORAGE` | ≤ 29 | Guardar archivos descargados (Android < 10) |
+| `READ_MEDIA_VIDEO` | ≥ 33 | Acceso a archivos de video (Android 13+) |
+| `READ_MEDIA_AUDIO` | ≥ 33 | Acceso a archivos de audio (Android 13+) |
+| `READ_MEDIA_IMAGES` | ≥ 33 | Acceso a imágenes (Android 13+) |
+| `FOREGROUND_SERVICE` | Todos | Ejecutar servicio en primer plano |
+| `FOREGROUND_SERVICE_DATA_SYNC` | ≥ 34 | Tipo específico del servicio de descarga |
+| `POST_NOTIFICATIONS` | ≥ 33 | Mostrar notificación de progreso (Android 13+) |
 
 ---
 
@@ -262,10 +291,21 @@ Salida: `build/app/outputs/bundle/release/app-release.aab`
 ### Cómo funciona
 
 1. Al iniciar la descarga se crea un `DownloadTask` con estado `downloading`
-2. El stream de bytes se escribe directamente al archivo de destino
-3. Si no llega ningún chunk en **90 segundos**, la descarga falla automáticamente (timeout)
-4. Al completarse, el progreso se guarda en un archivo JSON (`downloads.json`) en el directorio de documentos de la app
-5. Al reabrir la app se cargan las tareas anteriores; las que estaban en curso se marcan como `failed` ya que el stream no puede reanudarse entre sesiones
+2. Se lanza un **ForegroundService** de Android con una notificación persistente que muestra el progreso
+3. El stream de bytes se escribe directamente al archivo de destino
+4. La notificación se actualiza como máximo cada **500 ms** para evitar saturar el sistema
+5. Si no llega ningún chunk en **5 minutos (300 segundos)**, la descarga falla automáticamente (timeout)
+6. Al completarse todas las tareas activas, el servicio se detiene automáticamente
+7. El progreso se guarda en un archivo JSON (`downloads.json`) en el directorio de documentos de la app
+8. Al reabrir la app se cargan las tareas anteriores; las que estaban en curso se marcan como `failed` ya que el stream no puede reanudarse entre sesiones
+
+### Comportamiento al cerrar la app
+
+| Acción | Resultado |
+|---|---|
+| App minimizada (botón Home) | El servicio sigue corriendo, la descarga continúa |
+| App cerrada desde recientes (swipe) | El servicio y las descargas se detienen (`stopWithTask="true"`) |
+| Botón atrás / opción "Salir" | Se muestra un diálogo de confirmación; si hay descargas activas se advierte antes de cerrar |
 
 ### Ruta de descarga
 

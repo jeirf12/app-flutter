@@ -46,6 +46,7 @@ dependencies:
   dio: 5.10.0
   open_file: 3.5.11
   device_info_plus: 13.2.0
+  flutter_foreground_task: 8.17.0
 
 dev_dependencies:
   flutter_test:
