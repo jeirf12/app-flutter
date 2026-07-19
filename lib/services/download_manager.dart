@@ -16,42 +16,53 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
   final Map<String, IOSink> _fileSinks = {};
 
   // Si no llega ningún chunk en 90 s, el stream lanza TimeoutException.
-  static const _chunkTimeout = Duration(seconds: 90);
+  static const _chunkTimeout = Duration(seconds: 300);
 
   Future<bool> startDownload({
     required String videoId,
-    required String title,
-    required StreamInfo streamInfo,
+    required bool isAudio,
   }) async {
-    bool hasPermission = await _checkAndRequestPermissions();
-
+    final hasPermission = await _checkAndRequestPermissions();
     if (!hasPermission) {
-      print("No tiene permisos de storage");
+      print('No tiene permisos de storage');
       return false;
     }
 
-    final taskId = '${videoId}_${streamInfo.tag}';
-    final isAudioOnly = streamInfo is AudioOnlyStreamInfo;
-    final extension = isAudioOnly ? 'mp3' : 'mp4';
-    final filename = title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '');
-    final totalBytes = streamInfo.size.totalBytes;
+    try {
+      final video = await yt.videos.get(videoId);
+      final manifest = await yt.videos.streamsClient.getManifest(videoId);
 
-    final task = DownloadTask(
-      id: taskId,
-      title: title,
-      totalBytes: totalBytes,
-      status: DownloadStatus.downloading,
-      streamUrl: streamInfo.url.toString(),
-    );
-    value = [...value, task];
+      final StreamInfo streamInfo = isAudio
+          ? manifest.audioOnly.withHighestBitrate()
+          : manifest.muxed.bestQuality;
 
-    final outputPath = '/storage/emulated/0/Download/$filename.$extension';
-    task.filePath = outputPath;
-    notifyListeners();
+      final taskId = '${videoId}_${streamInfo.tag}';
+      final isAudioOnly = streamInfo is AudioOnlyStreamInfo;
+      final extension = isAudioOnly
+          ? streamInfo.codec.subtype
+          : 'mp4';
+      final filename = video.title.replaceAll(RegExp(r'[<>:"/\\|?*]'), '');
+      final totalBytes = streamInfo.size.totalBytes;
 
-    _runSimpleDownload(task, taskId, streamInfo, outputPath);
+      final task = DownloadTask(
+        id: taskId,
+        title: video.title,
+        totalBytes: totalBytes,
+        status: DownloadStatus.downloading,
+        streamUrl: streamInfo.url.toString(),
+      );
+      value = [...value, task];
 
-    return true;
+      final outputPath = '/storage/emulated/0/Download/$filename.$extension';
+      task.filePath = outputPath;
+      notifyListeners();
+
+      _runSimpleDownload(task, taskId, streamInfo, outputPath);
+      return true;
+    } catch (e) {
+      print('Error obteniendo info del video: $e');
+      return false;
+    }
   }
 
   void _runSimpleDownload(DownloadTask task, String taskId,
@@ -86,6 +97,7 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
           await _saveTasks();
         },
         onError: (e) async {
+          print('Error en stream de descarga: $e');
           await sink.close();
           _fileSinks.remove(taskId);
           _subscriptions.remove(taskId);
@@ -95,7 +107,7 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
         },
       );
     } catch (e) {
-      print('Error en descarga simple: $e');
+      print('Error en descarga: $e');
       task.status = DownloadStatus.failed;
       notifyListeners();
       await _saveTasks();
@@ -143,24 +155,31 @@ class DownloadManager extends ValueNotifier<List<DownloadTask>> {
   }
 
   Future<bool> _checkAndRequestPermissions() async {
-    PermissionStatus status;
-    if (Platform.isAndroid && (await _getAndroidVersion()) >= 33) {
-      status = await Permission.videos.request();
-    } else {
-      status = await Permission.storage.request();
+    if (!Platform.isAndroid) return true;
+
+    final sdkInt = await _getAndroidVersion();
+
+    final List<Permission> permissions = sdkInt >= 33
+        ? [Permission.videos, Permission.audio]
+        : [Permission.storage];
+
+    final statuses = await permissions.request();
+
+    final allGranted = statuses.values.every(
+      (s) => s.isGranted || s.isLimited,
+    );
+    if (allGranted) return true;
+
+    if (statuses.values.any((s) => s.isPermanentlyDenied)) {
+      await openAppSettings();
     }
 
-    if (status.isGranted) return true;
-
-    if (status.isPermanentlyDenied) {
-      openAppSettings(); // Redirige a configuración
-    }
     return false;
   }
 
   Future<int> _getAndroidVersion() async {
     if (Platform.isAndroid) {
-      DeviceInfoPlugin deviceInfo = new DeviceInfoPlugin();
+      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
       return androidInfo.version.sdkInt;
     }

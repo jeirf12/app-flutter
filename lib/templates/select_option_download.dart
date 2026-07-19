@@ -1,7 +1,6 @@
 import 'package:example_flutter/services/download_manager.dart';
 import 'package:example_flutter/templates/downloads_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 Future<void> showDownloadOptions(BuildContext context, String videoId) async {
   showModalBottomSheet(
@@ -23,7 +22,7 @@ Future<void> showDownloadOptions(BuildContext context, String videoId) async {
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.music_note, color: Colors.blue),
-            title: const Text('MP3 (Solo audio)'),
+            title: const Text('M4A (Solo audio)'),
             onTap: () {
               Navigator.pop(sheetContext);
               _download(context, videoId, isAudio: true);
@@ -54,29 +53,15 @@ void _download(
     builder: (_) => const Center(child: CircularProgressIndicator()),
   );
 
-  final yt = YoutubeExplode();
   try {
-    final manifest = await yt.videos.streamsClient.getManifest(videoId);
-    final video = await yt.videos.get(videoId);
-
-    final StreamInfo streamInfo;
-    if (isAudio) {
-      streamInfo = manifest.audioOnly.withHighestBitrate();
-    } else {
-      // Mejor calidad muxed disponible (audio + video en un solo stream)
-      streamInfo = manifest.muxed.sortByVideoQuality().last;
-    }
+    final success = await downloadManager.startDownload(
+      videoId: videoId,
+      isAudio: isAudio,
+    );
 
     if (!context.mounted) return;
     Navigator.pop(context);
 
-    final success = await downloadManager.startDownload(
-      videoId: videoId,
-      title: video.title,
-      streamInfo: streamInfo,
-    );
-
-    if (!context.mounted) return;
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo iniciar la descarga.')),
@@ -95,7 +80,5 @@ void _download(
         const SnackBar(content: Text('Error al obtener info del video.')),
       );
     }
-  } finally {
-    yt.close();
   }
 }
